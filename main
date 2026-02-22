@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Customer Review</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      height: 100vh;
+      background: #e0e0e0;
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      transition: background 0.4s;
+    }
+    #start {
+      padding: 24px 48px;
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: white;
+      background: #2e7d32;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+      transition: transform 0.1s;
+    }
+    #start:active {
+      transform: scale(0.96);
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9998;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .flash-text {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ff1744;
+      font-size: 12vw;
+      font-weight: 900;
+      text-shadow: 0 0 30px black;
+      background: rgba(0,0,0,0.65);
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    .cursor-none {
+      cursor: none !important;
+    }
+    #debug {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      background: rgba(0,0,0,0.85);
+      color: #0f0;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 8px;
+      border-radius: 6px;
+      z-index: 10000;
+      max-width: 360px;
+      max-height: 50vh;
+      overflow: auto;
+    }
+    #debug button { margin-top: 6px; display: inline-block; }
+    #dbg-meter { height: 8px; background: #222; margin-top:6px; border-radius:4px; overflow:hidden; }
+    #dbg-meter > i { display:block; height:100%; background:linear-gradient(90deg,#0f0,#ff0,#f00); width:0%; }
+  </style>
+</head>
+<body>
+
+  <button id="start">ENTER REVIEW</button>
+
+  <div id="overlay"></div>
+
+  <audio id="scream" loop preload="auto">
+    <source src="123.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    // ────────────────────────────────────────────────
+    // Main prank logic
+    // ────────────────────────────────────────────────
+
+    const startBtn   = document.getElementById('start');
+    const audio      = document.getElementById('scream');
+    const overlay    = document.getElementById('overlay');
+
+    let audioCtx, source, gainNode, filter;
+    // ─── Layered audio hell ─────────────────────────────────
+    // Creates several overlapping audio elements that start staggered
+    // so the same source layers on top of itself.
+    function initAudioHell() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx.resume().catch(()=>{});
+
+      const LAYERS = 5;
+      const audioLayers = [];
+
+      const masterGain = audioCtx.createGain();
+      // boost default so overlapping layers are audible
+      masterGain.gain.value = 1.5;
+
+      // add analyser between master gain and destination for VU meter
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      masterGain.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      window._analyser = analyser;
+      window._masterGain = masterGain;
+
+      // Create HTMLAudio elements and connect each to the audio context
+      for (let i = 0; i < LAYERS; i++) {
+        const a = new Audio('123.mp3');
+        a.preload = 'auto';
+        a.loop = true;
+        a.volume = 1.0;
+
+        // create source + per-layer gain for subtle differences
+        try {
+          const src = audioCtx.createMediaElementSource(a);
+          const g = audioCtx.createGain();
+          // stronger per-layer gain so layers add up
+          g.gain.value = 0.9 + (Math.random() * 0.6);
+          src.connect(g).connect(masterGain);
+        } catch (err) {
+          // some browsers may throw if audio context is not allowed yet
+        }
+
+        // ensure element is not muted
+        a.muted = false;
+        audioLayers.push(a);
+      }
+
+      // When metadata is available, stagger start times so layers overlap
+      const first = audioLayers[0];
+      const startLayers = (durationMs) => {
+        const stagger = Math.max(120, Math.floor(durationMs * 0.6)); // ms
+        audioLayers.forEach((a, i) => {
+          setTimeout(() => {
+            a.play().catch(err => {
+              window._audioErrors = window._audioErrors || [];
+              try { window._audioErrors.push(err && err.message ? err.message : String(err)); } catch(e){ window._audioErrors.push(String(err)); }
+            });
+          }, i * stagger);
+        });
+      };
+
+      first.addEventListener('loadedmetadata', () => {
+        const durMs = (first.duration && isFinite(first.duration) && first.duration > 0) ? Math.floor(first.duration * 1000) : 2000;
+        startLayers(durMs);
+      }, { once: true });
+
+      // Kick off loading and fallback if metadata never fires
+      audioLayers.forEach(a => a.load());
+      // expose for debugging
+      window._audioLayers = audioLayers;
+      window._audioCtx = audioCtx;
+      setTimeout(() => {
+        // fallback: start staggered with an estimated duration
+        startLayers(2000);
+      }, 1800);
+    }
+
+    // Debug overlay to inspect audio elements and playback errors
+    function createDebugOverlay() {
+      const d = document.createElement('div');
+      d.id = 'debug';
+      d.innerHTML = '<div id="dbg-content">Debug: initializing...</div>\n<button id="dbg-resume">Resume AudioContext</button> <button id="dbg-playtest">Play Test Tone</button> <br/>Master: <input id="dbg-vol" type="range" min="0" max="400" value="150"> <span id="dbg-vol-val">1.5</span>\n<div id="dbg-meter"><i></i></div>';
+      document.body.appendChild(d);
+
+      const content = document.getElementById('dbg-content');
+
+      document.getElementById('dbg-resume').addEventListener('click', () => {
+        if (audioCtx) audioCtx.resume().then(()=>update()); else update();
+      });
+
+      document.getElementById('dbg-playtest').addEventListener('click', () => {
+        try {
+          const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = 440;
+          g.gain.value = 0.05;
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.start();
+          setTimeout(() => { o.stop(); }, 300);
+        } catch (e) {
+          window._audioErrors = window._audioErrors || [];
+          window._audioErrors.push(String(e));
+        }
+        update();
+      });
+
+      const vol = document.getElementById('dbg-vol');
+      const volVal = document.getElementById('dbg-vol-val');
+      vol.addEventListener('input', () => {
+        const v = Number(vol.value) / 100;
+        volVal.textContent = v.toFixed(2);
+        try { if (window._masterGain) window._masterGain.gain.value = v; } catch(e){}
+      });
+
+      function update() {
+        const audios = Array.from(document.querySelectorAll('audio')).concat(window._audioLayers || []);
+        let html = '';
+        html += 'Audio elements: ' + audios.length + '<br/>';
+        audios.forEach((a,i)=>{
+          try {
+            html += '<b>#' + i + '</b> src:' + (a.currentSrc || a.src) + ' paused:' + a.paused + ' readyState:' + a.readyState + ' currentTime:' + (a.currentTime ? a.currentTime.toFixed(2) : '0') + ' vol:' + a.volume + '<br/>';
+          } catch(e) {
+            html += '<b>#' + i + '</b> error reading properties<br/>';
+          }
+        });
+        html += '<br/><b>Errors:</b><br/>' + ((window._audioErrors && window._audioErrors.length) ? window._audioErrors.join('<br/>') : 'none');
+        content.innerHTML = html;
+        // update VU meter
+        try {
+          const an = window._analyser;
+          if (an) {
+            const buf = new Uint8Array(an.frequencyBinCount);
+            an.getByteFrequencyData(buf);
+            let sum = 0;
+            for (let i=0;i<buf.length;i++) sum += buf[i];
+            const avg = sum / buf.length;
+            const pct = Math.min(100, Math.floor((avg/255)*100));
+            const bar = document.querySelector('#dbg-meter > i');
+            if (bar) bar.style.width = pct + '%';
+          }
+        } catch(e){}
+      }
+
+      window._debugInterval && clearInterval(window._debugInterval);
+      window._debugInterval = setInterval(update, 500);
+      update();
+    }
+
+    // create overlay immediately so user can debug before starting
+    createDebugOverlay();
+
+    // ─── 2. Visual assault ────────────────────────────────────
+    function startStrobeAndFlashes() {
+      document.body.classList.add('cursor-none');
+
+      // Bright black & white strobe
+      let white = false;
+      const strobeInterval = setInterval(() => {
+        white = !white;
+        overlay.style.background = white ? '#ffffff' : '#000000';
+        overlay.style.opacity = '1';
+      }, 80); // ~12.5 Hz (adjustable)
+
+      // Large flashing text (contrasting color)
+      setInterval(() => {
+        const texts = [
+          "YOU CAN'T LEAVE",
+          "WE SEE YOU",
+          "SCREAM",
+          "IT'S TOO LATE",
+          "NO ESCAPE",
+          "BEHIND YOU"
+        ];
+        const txt = texts[Math.floor(Math.random()*texts.length)];
+
+        const flash = document.createElement('div');
+        flash.className = 'flash-text';
+        flash.textContent = txt;
+        // contrast with current strobe color
+        flash.style.color = white ? '#000000' : '#ffffff';
+        document.body.appendChild(flash);
+
+        setTimeout(() => { flash.style.opacity = '1'; }, 30);
+        setTimeout(() => {
+          flash.style.opacity = '0';
+          setTimeout(() => flash.remove(), 600);
+        }, 250 + Math.random()*300);
+      }, 4500 + Math.random()*8000);
+    }
+
+    // ─── 3. Browser lockdown ──────────────────────────────────
+    function lockBrowser() {
+      // Block escape
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }, { capture: true });
+
+      // Spam history so back button is useless
+      history.pushState(null, null, location.href);
+      window.onpopstate = () => {
+        history.pushState(null, null, location.href);
+      };
+
+      // Nag on leave attempt
+      window.addEventListener('beforeunload', e => {
+        e.preventDefault();
+        e.returnValue = 'Your review will be lost. Are you sure?';
+      });
+
+      // Re-enter fullscreen aggressively
+      document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement && document.visibilityState === 'visible') {
+          setTimeout(() => {
+            document.documentElement.requestFullscreen().catch(()=>{});
+          }, 400);
+        }
+      });
+    }
+
+    // ─── 4. Vibration torture (mobile) ────────────────────────
+    function startVibrationHell() {
+      if (!('vibrate' in navigator)) return;
+
+      function vibrate() {
+        navigator.vibrate([160, 70, 160, 70, 280, 100, 160]);
+      }
+
+      vibrate();
+      setInterval(vibrate, 2200);
+    }
+
+    // ─── Main trigger ─────────────────────────────────────────
+    startBtn.addEventListener('click', () => {
+      // Start audio and visuals immediately in the user gesture stack
+      initAudioHell();
+      startStrobeAndFlashes();
+      lockBrowser();
+      startVibrationHell();
+
+      // Attempt fullscreen but don't await — keep audio in the gesture path
+      document.documentElement.requestFullscreen().catch(() => {});
+
+      // Hide button and darken background
+      startBtn.style.display = 'none';
+      document.body.style.background = '#000';
+    });
+
+    // Trigger the same review/start sequence when user presses Enter
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        // Prevent default to avoid unintended form submissions
+        e.preventDefault();
+        startBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>
