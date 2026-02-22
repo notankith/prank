@@ -66,11 +66,61 @@
       cursor: none !important;
     }
     /* debug overlay removed for production */
+    .container { width: 100%; display:flex; justify-content:center; padding:36px; }
+    .card { width: 100%; max-width:1100px; background: #fff; border-radius:12px; box-shadow: 0 10px 40px rgba(0,0,0,0.12); display:flex; overflow:hidden; }
+    .left { padding:28px; width:60%; border-right:1px solid #eee; }
+    .right { padding:28px; width:40%; display:flex; flex-direction:column; }
+    h1 { font-size:1.6rem; margin-bottom:6px; }
+    .muted { color:#555; margin-bottom:12px; }
+    .stats { display:flex; gap:12px; margin:14px 0 18px; }
+    .stat { background:#f7f7f7; padding:12px 16px; border-radius:8px; text-align:center; }
+    .stat span { display:block; color:#666; font-size:12px; margin-top:6px; }
+    .reviews-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .add-review { background:#1976d2; color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:700; }
+    .review-list { display:flex; flex-direction:column; gap:12px; overflow:auto; max-height:420px; }
+    .review { background:#fafafa; padding:12px; border-radius:8px; }
+    .rating { float:right; color:#f39c12; }
   </style>
 </head>
 <body>
 
-  <button id="start">ENTER REVIEW</button>
+  <div class="container">
+    <div class="card">
+      <div class="left">
+        <h1>Acme Automation — Conveyor IQ</h1>
+        <p class="muted">An end-to-end automation project delivering predictive conveyor maintenance and throughput optimisation.</p>
+
+        <div class="stats">
+          <div class="stat"><strong>99.2%</strong><span>Uptime</span></div>
+          <div class="stat"><strong>+24%</strong><span>Throughput</span></div>
+          <div class="stat"><strong>6 mo</strong><span>Time to Value</span></div>
+        </div>
+
+        <h3>Overview</h3>
+        <p>Delivered modular edge agents, a central analytics pipeline and a dashboard for realtime alerts. The system reduces manual checks and automatically schedules maintenance.</p>
+
+        <h3>Highlights</h3>
+        <ul>
+          <li>Edge-first design with resilient buffering</li>
+          <li>Auto-scheduling and prioritised work orders</li>
+          <li>Closed-loop optimisation using RL components</li>
+        </ul>
+      </div>
+
+      <div class="right">
+        <div class="reviews-header">
+          <h2>Customer Reviews</h2>
+          <button id="start" class="add-review">Add Review</button>
+        </div>
+
+        <div class="review-list">
+          <div class="review"><strong>J. Patel</strong><span class="rating">★★★★★</span><p>Significant reduction in downtime — great delivery.</p></div>
+          <div class="review"><strong>M. Rivera</strong><span class="rating">★★★★☆</span><p>Solid engineering but initial config was intricate.</p></div>
+          <div class="review"><strong>L. Chen</strong><span class="rating">★★★★★</span><p>Excellent monitoring and alerts — saved us hours weekly.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="overlay"></div>
 
