@@ -15,12 +15,7 @@
         { "key": "Content-Disposition", "value": "inline" }
       ]
     },
-    {
-      "source": "/*.html",
-      "headers": [
-        { "key": "Content-Type", "value": "text/html; charset=utf-8" }
-      ]
-    },
+    
     {
       "source": "/123.mp3",
       "headers": [
