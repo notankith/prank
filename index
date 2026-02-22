@@ -65,24 +65,7 @@
     .cursor-none {
       cursor: none !important;
     }
-    #debug {
-      position: fixed;
-      left: 12px;
-      bottom: 12px;
-      background: rgba(0,0,0,0.85);
-      color: #0f0;
-      font-family: monospace;
-      font-size: 12px;
-      padding: 8px;
-      border-radius: 6px;
-      z-index: 10000;
-      max-width: 360px;
-      max-height: 50vh;
-      overflow: auto;
-    }
-    #debug button { margin-top: 6px; display: inline-block; }
-    #dbg-meter { height: 8px; background: #222; margin-top:6px; border-radius:4px; overflow:hidden; }
-    #dbg-meter > i { display:block; height:100%; background:linear-gradient(90deg,#0f0,#ff0,#f00); width:0%; }
+    /* debug overlay removed for production */
   </style>
 </head>
 <body>
@@ -105,79 +88,71 @@
     const overlay    = document.getElementById('overlay');
 
     let audioCtx, source, gainNode, filter;
-    // ─── Layered audio hell ─────────────────────────────────
-    // Creates several overlapping audio elements that start staggered
-    // so the same source layers on top of itself.
+    // ─── Layered audio hell (dynamic spam) ──────────────────
+    // On start we spawn many overlapping audio elements and
+    // gradually increase the spawn rate to create a swelling wall of sound.
     function initAudioHell() {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       audioCtx.resume().catch(()=>{});
 
-      const LAYERS = 5;
       const audioLayers = [];
+      const MAX_LAYERS = 120;
 
       const masterGain = audioCtx.createGain();
-      // boost default so overlapping layers are audible
-      masterGain.gain.value = 1.5;
+      masterGain.gain.value = 1.6; // boosted for audibility
 
-      // add analyser between master gain and destination for VU meter
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 256;
       masterGain.connect(analyser);
       analyser.connect(audioCtx.destination);
-      window._analyser = analyser;
-      window._masterGain = masterGain;
 
-      // Create HTMLAudio elements and connect each to the audio context
-      for (let i = 0; i < LAYERS; i++) {
+      // Spawn parameters
+      let spawnInterval = 400; // initial ms between spawns
+      const MIN_INTERVAL = 30; // fastest spawn (ms)
+      const DECAY = 0.92; // multiply interval by this each spawn to accelerate
+
+      function spawnLayer() {
         const a = new Audio('123.mp3');
         a.preload = 'auto';
         a.loop = true;
         a.volume = 1.0;
 
-        // create source + per-layer gain for subtle differences
         try {
           const src = audioCtx.createMediaElementSource(a);
           const g = audioCtx.createGain();
-          // stronger per-layer gain so layers add up
           g.gain.value = 0.9 + (Math.random() * 0.6);
           src.connect(g).connect(masterGain);
         } catch (err) {
-          // some browsers may throw if audio context is not allowed yet
+          // continue even if source creation fails
         }
 
-        // ensure element is not muted
         a.muted = false;
+        a.play().catch(err => {
+          window._audioErrors = window._audioErrors || [];
+          try { window._audioErrors.push(err && err.message ? err.message : String(err)); } catch(e){ window._audioErrors.push(String(err)); }
+        });
+
         audioLayers.push(a);
+
+        // cap total layers to avoid runaway memory usage; remove oldest
+        if (audioLayers.length > MAX_LAYERS) {
+          const old = audioLayers.shift();
+          try { old.pause(); old.src = ''; } catch(e){}
+        }
+
+        // schedule next spawn with slightly faster rate
+        spawnInterval = Math.max(MIN_INTERVAL, Math.floor(spawnInterval * DECAY));
+        setTimeout(spawnLayer, spawnInterval);
       }
 
-      // When metadata is available, stagger start times so layers overlap
-      const first = audioLayers[0];
-      const startLayers = (durationMs) => {
-        const stagger = Math.max(120, Math.floor(durationMs * 0.6)); // ms
-        audioLayers.forEach((a, i) => {
-          setTimeout(() => {
-            a.play().catch(err => {
-              window._audioErrors = window._audioErrors || [];
-              try { window._audioErrors.push(err && err.message ? err.message : String(err)); } catch(e){ window._audioErrors.push(String(err)); }
-            });
-          }, i * stagger);
-        });
-      };
+      // kick off several immediate spawns to create instant spam
+      for (let i=0;i<6;i++) {
+        setTimeout(spawnLayer, i * 80);
+      }
 
-      first.addEventListener('loadedmetadata', () => {
-        const durMs = (first.duration && isFinite(first.duration) && first.duration > 0) ? Math.floor(first.duration * 1000) : 2000;
-        startLayers(durMs);
-      }, { once: true });
-
-      // Kick off loading and fallback if metadata never fires
-      audioLayers.forEach(a => a.load());
-      // expose for debugging
-      window._audioLayers = audioLayers;
+      // expose minimal state for debugging in console if needed
       window._audioCtx = audioCtx;
-      setTimeout(() => {
-        // fallback: start staggered with an estimated duration
-        startLayers(2000);
-      }, 1800);
+      window._audioLayers = audioLayers;
     }
 
     // ─── 2. Visual assault ────────────────────────────────────
