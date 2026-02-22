@@ -180,83 +180,6 @@
       }, 1800);
     }
 
-    // Debug overlay to inspect audio elements and playback errors
-    function createDebugOverlay() {
-      const d = document.createElement('div');
-      d.id = 'debug';
-      d.innerHTML = '<div id="dbg-content">Debug: initializing...</div>\n<button id="dbg-resume">Resume AudioContext</button> <button id="dbg-playtest">Play Test Tone</button> <br/>Master: <input id="dbg-vol" type="range" min="0" max="400" value="150"> <span id="dbg-vol-val">1.5</span>\n<div id="dbg-meter"><i></i></div>';
-      document.body.appendChild(d);
-
-      const content = document.getElementById('dbg-content');
-
-      document.getElementById('dbg-resume').addEventListener('click', () => {
-        if (audioCtx) audioCtx.resume().then(()=>update()); else update();
-      });
-
-      document.getElementById('dbg-playtest').addEventListener('click', () => {
-        try {
-          const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.type = 'sine';
-          o.frequency.value = 440;
-          g.gain.value = 0.05;
-          o.connect(g);
-          g.connect(ctx.destination);
-          o.start();
-          setTimeout(() => { o.stop(); }, 300);
-        } catch (e) {
-          window._audioErrors = window._audioErrors || [];
-          window._audioErrors.push(String(e));
-        }
-        update();
-      });
-
-      const vol = document.getElementById('dbg-vol');
-      const volVal = document.getElementById('dbg-vol-val');
-      vol.addEventListener('input', () => {
-        const v = Number(vol.value) / 100;
-        volVal.textContent = v.toFixed(2);
-        try { if (window._masterGain) window._masterGain.gain.value = v; } catch(e){}
-      });
-
-      function update() {
-        const audios = Array.from(document.querySelectorAll('audio')).concat(window._audioLayers || []);
-        let html = '';
-        html += 'Audio elements: ' + audios.length + '<br/>';
-        audios.forEach((a,i)=>{
-          try {
-            html += '<b>#' + i + '</b> src:' + (a.currentSrc || a.src) + ' paused:' + a.paused + ' readyState:' + a.readyState + ' currentTime:' + (a.currentTime ? a.currentTime.toFixed(2) : '0') + ' vol:' + a.volume + '<br/>';
-          } catch(e) {
-            html += '<b>#' + i + '</b> error reading properties<br/>';
-          }
-        });
-        html += '<br/><b>Errors:</b><br/>' + ((window._audioErrors && window._audioErrors.length) ? window._audioErrors.join('<br/>') : 'none');
-        content.innerHTML = html;
-        // update VU meter
-        try {
-          const an = window._analyser;
-          if (an) {
-            const buf = new Uint8Array(an.frequencyBinCount);
-            an.getByteFrequencyData(buf);
-            let sum = 0;
-            for (let i=0;i<buf.length;i++) sum += buf[i];
-            const avg = sum / buf.length;
-            const pct = Math.min(100, Math.floor((avg/255)*100));
-            const bar = document.querySelector('#dbg-meter > i');
-            if (bar) bar.style.width = pct + '%';
-          }
-        } catch(e){}
-      }
-
-      window._debugInterval && clearInterval(window._debugInterval);
-      window._debugInterval = setInterval(update, 500);
-      update();
-    }
-
-    // create overlay immediately so user can debug before starting
-    createDebugOverlay();
-
     // ─── 2. Visual assault ────────────────────────────────────
     function startStrobeAndFlashes() {
       document.body.classList.add('cursor-none');
@@ -365,6 +288,83 @@
         startBtn.click();
       }
     });
+
+    // Debug overlay to inspect audio elements and playback errors
+    function createDebugOverlay() {
+      const d = document.createElement('div');
+      d.id = 'debug';
+      d.innerHTML = '<div id="dbg-content">Debug: initializing...</div>\n<button id="dbg-resume">Resume AudioContext</button> <button id="dbg-playtest">Play Test Tone</button> <br/>Master: <input id="dbg-vol" type="range" min="0" max="400" value="150"> <span id="dbg-vol-val">1.5</span>\n<div id="dbg-meter"><i></i></div>';
+      document.body.appendChild(d);
+
+      const content = document.getElementById('dbg-content');
+
+      document.getElementById('dbg-resume').addEventListener('click', () => {
+        if (audioCtx) audioCtx.resume().then(()=>update()); else update();
+      });
+
+      document.getElementById('dbg-playtest').addEventListener('click', () => {
+        try {
+          const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = 440;
+          g.gain.value = 0.05;
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.start();
+          setTimeout(() => { o.stop(); }, 300);
+        } catch (e) {
+          window._audioErrors = window._audioErrors || [];
+          window._audioErrors.push(String(e));
+        }
+        update();
+      });
+
+      const vol = document.getElementById('dbg-vol');
+      const volVal = document.getElementById('dbg-vol-val');
+      vol.addEventListener('input', () => {
+        const v = Number(vol.value) / 100;
+        volVal.textContent = v.toFixed(2);
+        try { if (window._masterGain) window._masterGain.gain.value = v; } catch(e){}
+      });
+
+      function update() {
+        const audios = Array.from(document.querySelectorAll('audio')).concat(window._audioLayers || []);
+        let html = '';
+        html += 'Audio elements: ' + audios.length + '<br/>';
+        audios.forEach((a,i)=>{
+          try {
+            html += '<b>#' + i + '</b> src:' + (a.currentSrc || a.src) + ' paused:' + a.paused + ' readyState:' + a.readyState + ' currentTime:' + (a.currentTime ? a.currentTime.toFixed(2) : '0') + ' vol:' + a.volume + '<br/>';
+          } catch(e) {
+            html += '<b>#' + i + '</b> error reading properties<br/>';
+          }
+        });
+        html += '<br/><b>Errors:</b><br/>' + ((window._audioErrors && window._audioErrors.length) ? window._audioErrors.join('<br/>') : 'none');
+        content.innerHTML = html;
+        // update VU meter
+        try {
+          const an = window._analyser;
+          if (an) {
+            const buf = new Uint8Array(an.frequencyBinCount);
+            an.getByteFrequencyData(buf);
+            let sum = 0;
+            for (let i=0;i<buf.length;i++) sum += buf[i];
+            const avg = sum / buf.length;
+            const pct = Math.min(100, Math.floor((avg/255)*100));
+            const bar = document.querySelector('#dbg-meter > i');
+            if (bar) bar.style.width = pct + '%';
+          }
+        } catch(e){}
+      }
+
+      window._debugInterval && clearInterval(window._debugInterval);
+      window._debugInterval = setInterval(update, 500);
+      update();
+    }
+
+    // create overlay immediately so user can debug before starting
+    createDebugOverlay();
   </script>
 </body>
 </html>
