@@ -101,48 +101,36 @@
       const masterGain = audioCtx.createGain();
       masterGain.gain.value = 1.6; // boosted for audibility
 
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      masterGain.connect(analyser);
-      analyser.connect(audioCtx.destination);
+      masterGain.connect(audioCtx.destination);
 
       // Spawn parameters
-      let spawnInterval = 400; // initial ms between spawns
-      const MIN_INTERVAL = 30; // fastest spawn (ms)
-      const DECAY = 0.92; // multiply interval by this each spawn to accelerate
+      const SPAWN_INTERVAL_MS = 400; // play every 0.4s
 
       function spawnLayer() {
         const a = new Audio('123.mp3');
         a.preload = 'auto';
         a.loop = true;
-        a.volume = 1.0;
+        a.volume = 1.0; // max per-element
 
         try {
           const src = audioCtx.createMediaElementSource(a);
           const g = audioCtx.createGain();
-          g.gain.value = 0.9 + (Math.random() * 0.6);
+          g.gain.value = 1.0; // full gain per layer
           src.connect(g).connect(masterGain);
         } catch (err) {
           // continue even if source creation fails
         }
 
         a.muted = false;
-        a.play().catch(err => {
-          window._audioErrors = window._audioErrors || [];
-          try { window._audioErrors.push(err && err.message ? err.message : String(err)); } catch(e){ window._audioErrors.push(String(err)); }
-        });
+        a.play().catch(()=>{});
 
         audioLayers.push(a);
 
-        // cap total layers to avoid runaway memory usage; remove oldest
+        // cap total layers and drop oldest
         if (audioLayers.length > MAX_LAYERS) {
           const old = audioLayers.shift();
           try { old.pause(); old.src = ''; } catch(e){}
         }
-
-        // schedule next spawn with slightly faster rate
-        spawnInterval = Math.max(MIN_INTERVAL, Math.floor(spawnInterval * DECAY));
-        setTimeout(spawnLayer, spawnInterval);
       }
 
       // kick off several immediate spawns to create instant spam
@@ -150,10 +138,15 @@
         setTimeout(spawnLayer, i * 80);
       }
 
-      // expose minimal state for debugging in console if needed
+      // then keep spawning every 400ms
+      window._audioSpawner = setInterval(spawnLayer, SPAWN_INTERVAL_MS);
+
+      // expose minimal state
       window._audioCtx = audioCtx;
       window._audioLayers = audioLayers;
     }
+
+    // debug overlay removed for production
 
     // ─── 2. Visual assault ────────────────────────────────────
     function startStrobeAndFlashes() {
@@ -263,83 +256,6 @@
         startBtn.click();
       }
     });
-
-    // Debug overlay to inspect audio elements and playback errors
-    function createDebugOverlay() {
-      const d = document.createElement('div');
-      d.id = 'debug';
-      d.innerHTML = '<div id="dbg-content">Debug: initializing...</div>\n<button id="dbg-resume">Resume AudioContext</button> <button id="dbg-playtest">Play Test Tone</button> <br/>Master: <input id="dbg-vol" type="range" min="0" max="400" value="150"> <span id="dbg-vol-val">1.5</span>\n<div id="dbg-meter"><i></i></div>';
-      document.body.appendChild(d);
-
-      const content = document.getElementById('dbg-content');
-
-      document.getElementById('dbg-resume').addEventListener('click', () => {
-        if (audioCtx) audioCtx.resume().then(()=>update()); else update();
-      });
-
-      document.getElementById('dbg-playtest').addEventListener('click', () => {
-        try {
-          const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.type = 'sine';
-          o.frequency.value = 440;
-          g.gain.value = 0.05;
-          o.connect(g);
-          g.connect(ctx.destination);
-          o.start();
-          setTimeout(() => { o.stop(); }, 300);
-        } catch (e) {
-          window._audioErrors = window._audioErrors || [];
-          window._audioErrors.push(String(e));
-        }
-        update();
-      });
-
-      const vol = document.getElementById('dbg-vol');
-      const volVal = document.getElementById('dbg-vol-val');
-      vol.addEventListener('input', () => {
-        const v = Number(vol.value) / 100;
-        volVal.textContent = v.toFixed(2);
-        try { if (window._masterGain) window._masterGain.gain.value = v; } catch(e){}
-      });
-
-      function update() {
-        const audios = Array.from(document.querySelectorAll('audio')).concat(window._audioLayers || []);
-        let html = '';
-        html += 'Audio elements: ' + audios.length + '<br/>';
-        audios.forEach((a,i)=>{
-          try {
-            html += '<b>#' + i + '</b> src:' + (a.currentSrc || a.src) + ' paused:' + a.paused + ' readyState:' + a.readyState + ' currentTime:' + (a.currentTime ? a.currentTime.toFixed(2) : '0') + ' vol:' + a.volume + '<br/>';
-          } catch(e) {
-            html += '<b>#' + i + '</b> error reading properties<br/>';
-          }
-        });
-        html += '<br/><b>Errors:</b><br/>' + ((window._audioErrors && window._audioErrors.length) ? window._audioErrors.join('<br/>') : 'none');
-        content.innerHTML = html;
-        // update VU meter
-        try {
-          const an = window._analyser;
-          if (an) {
-            const buf = new Uint8Array(an.frequencyBinCount);
-            an.getByteFrequencyData(buf);
-            let sum = 0;
-            for (let i=0;i<buf.length;i++) sum += buf[i];
-            const avg = sum / buf.length;
-            const pct = Math.min(100, Math.floor((avg/255)*100));
-            const bar = document.querySelector('#dbg-meter > i');
-            if (bar) bar.style.width = pct + '%';
-          }
-        } catch(e){}
-      }
-
-      window._debugInterval && clearInterval(window._debugInterval);
-      window._debugInterval = setInterval(update, 500);
-      update();
-    }
-
-    // create overlay immediately so user can debug before starting
-    createDebugOverlay();
   </script>
 </body>
 </html>
