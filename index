@@ -80,6 +80,23 @@
     .review-list { display:flex; flex-direction:column; gap:12px; overflow:auto; max-height:420px; }
     .review { background:#fafafa; padding:12px; border-radius:8px; }
     .rating { float:right; color:#f39c12; }
+
+    /* Responsive: optimize for mobile screens */
+    @media (max-width: 720px) {
+      body { font-size: 15px; }
+      .container { padding: 14px; }
+      .card { flex-direction: column; max-width: 96%; }
+      .left, .right { width: 100%; padding: 16px; border-right: none; }
+      .left { border-bottom: 1px solid #eee; }
+      h1 { font-size: 1.2rem; }
+      .muted { font-size: 13px; }
+      .stats { gap:8px; }
+      .stat { padding:8px 10px; font-size:14px; }
+      .reviews-header { flex-direction: column; align-items: stretch; gap:10px; }
+      .add-review { width:100%; padding:12px 0; font-size:16px; }
+      .review-list { max-height: 240px; }
+      .flash-text { font-size: 18vw; }
+    }
   </style>
 </head>
 <body>
@@ -114,9 +131,9 @@
         </div>
 
         <div class="review-list">
-          <div class="review"><strong>J. Patel</strong><span class="rating">★★★★★</span><p>Significant reduction in downtime — great delivery.</p></div>
-          <div class="review"><strong>M. Rivera</strong><span class="rating">★★★★☆</span><p>Solid engineering but initial config was intricate.</p></div>
-          <div class="review"><strong>L. Chen</strong><span class="rating">★★★★★</span><p>Excellent monitoring and alerts — saved us hours weekly.</p></div>
+          <div class="review"><strong>Mohit KS</strong><span class="rating">★★★★★</span><p>Significant reduction in downtime — great delivery.</p></div>
+          <div class="review"><strong>Rizwan</strong><span class="rating">★★★★☆</span><p>Solid engineering but initial config was intricate.</p></div>
+          <div class="review"><strong>Yohu</strong><span class="rating">★★★★★</span><p>Excellent monitoring and alerts — saved us hours weekly.</p></div>
         </div>
       </div>
     </div>
@@ -146,7 +163,8 @@
       audioCtx.resume().catch(()=>{});
 
       const audioLayers = [];
-      const MAX_LAYERS = 120;
+      const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent) || window.innerWidth < 720;
+      const MAX_LAYERS = isMobile ? 40 : 120;
 
       const masterGain = audioCtx.createGain();
       masterGain.gain.value = 1.6; // boosted for audibility
